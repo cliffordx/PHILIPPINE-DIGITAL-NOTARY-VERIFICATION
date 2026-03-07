@@ -1,17 +1,22 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { DocumentHash } from '../../entities/document-hash.entity';
-import { FraudAlert } from '../../entities/fraud-alert.entity';
-import { NotarizedDocument } from '../../entities/notarized-document.entity';
+import { BullModule } from '@nestjs/bullmq';
+import { RepositoriesModule } from '../../repositories/repositories.module';
 import { AuditModule } from '../audit/audit.module';
+import { FraudController } from './fraud.controller';
+import { FRAUD_ANALYSIS_QUEUE } from './fraud.constants';
+import { FraudProcessor } from './fraud.processor';
 import { FraudService } from './fraud.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([FraudAlert, NotarizedDocument, DocumentHash]),
+    RepositoriesModule,
     AuditModule,
+    BullModule.registerQueue({
+      name: FRAUD_ANALYSIS_QUEUE,
+    }),
   ],
-  providers: [FraudService],
+  controllers: [FraudController],
+  providers: [FraudService, FraudProcessor],
   exports: [FraudService],
 })
 export class FraudModule {}

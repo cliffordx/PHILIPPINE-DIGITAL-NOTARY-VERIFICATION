@@ -6,19 +6,19 @@ async function run() {
   console.log({
     seedUsers: [
       {
-        email: 'admin@ibp.gov.ph',
+        email: 'admin@ibp.example.ph',
         password: 'ChangeMe123!',
         passwordHash,
         role: 'IBP_ADMIN',
       },
       {
-        email: 'auditor@ibp.gov.ph',
+        email: 'auditor@ibp.example.ph',
         password: 'ChangeMe123!',
         passwordHash,
         role: 'AUDITOR',
       },
       {
-        email: 'notary1@ibp.gov.ph',
+        email: 'notary1@ibp.example.ph',
         password: 'ChangeMe123!',
         passwordHash,
         role: 'NOTARY',

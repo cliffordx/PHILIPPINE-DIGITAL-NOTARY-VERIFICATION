@@ -2301,19 +2301,19 @@ async function run() {
   console.log({
     seedUsers: [
       {
-        email: 'admin@ibp.gov.ph',
+        email: 'admin@ibp.example.ph',
         password: 'ChangeMe123!',
         passwordHash,
         role: 'IBP_ADMIN',
       },
       {
-        email: 'auditor@ibp.gov.ph',
+        email: 'auditor@ibp.example.ph',
         password: 'ChangeMe123!',
         passwordHash,
         role: 'AUDITOR',
       },
       {
-        email: 'notary1@ibp.gov.ph',
+        email: 'notary1@ibp.example.ph',
         password: 'ChangeMe123!',
         passwordHash,
         role: 'NOTARY',
@@ -2395,7 +2395,7 @@ http://localhost:3000/api/docs
 ## Example Login Request   
 ```
 {
-  "email": "notary1@ibp.gov.ph",
+  "email": "notary1@ibp.example.ph",
   "password": "ChangeMe123!"
 }
 
@@ -2406,7 +2406,7 @@ http://localhost:3000/api/docs
   "accessToken": "jwt-token-here",
   "user": {
     "id": "uuid",
-    "email": "notary1@ibp.gov.ph",
+    "email": "notary1@ibp.example.ph",
     "role": "NOTARY",
     "fullName": "Atty. Example User",
     "ibpNumber": "IBP-2026-0001"

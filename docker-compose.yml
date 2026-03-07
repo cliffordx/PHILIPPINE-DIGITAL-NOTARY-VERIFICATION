@@ -6,11 +6,13 @@ services:
       - '3000:3000'
     env_file:
       - .env
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+      REDIS_HOST: redis
     depends_on:
       - postgres
-    volumes:
-      - .:/app
-    command: npm run start:dev
+      - redis
 
   postgres:
     image: postgres:15-alpine
@@ -26,5 +28,15 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./database/migrations/initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql:ro
 
+  redis:
+    image: redis:7-alpine
+    container_name: digital-notary-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+
 volumes:
   postgres_data:
+  redis_data:

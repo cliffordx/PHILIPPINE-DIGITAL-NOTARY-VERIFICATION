@@ -3,23 +3,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { DocumentHash } from '../../entities/document-hash.entity';
-import { NotarizedDocument } from '../../entities/notarized-document.entity';
-import { VerificationRequest } from '../../entities/verification-request.entity';
+import { DocumentHashDataRepository } from '../../repositories/document-hash-data.repository';
+import { NotarizedDocumentDataRepository } from '../../repositories/notarized-document-data.repository';
+import { VerificationRequestDataRepository } from '../../repositories/verification-request-data.repository';
 import { AuditService } from '../audit/audit.service';
 import { VerifyDocumentDto } from './dto/verify-document.dto';
 
 @Injectable()
 export class VerificationService {
   constructor(
-    @InjectRepository(NotarizedDocument)
-    private readonly documentRepository: Repository<NotarizedDocument>,
-    @InjectRepository(DocumentHash)
-    private readonly hashRepository: Repository<DocumentHash>,
-    @InjectRepository(VerificationRequest)
-    private readonly verificationRequestRepository: Repository<VerificationRequest>,
+    private readonly documentRepository: NotarizedDocumentDataRepository,
+    private readonly hashRepository: DocumentHashDataRepository,
+    private readonly verificationRequestRepository: VerificationRequestDataRepository,
     private readonly auditService: AuditService,
   ) {}
 
@@ -28,20 +23,14 @@ export class VerificationService {
       throw new BadRequestException('serialNumber or sha256Hash is required');
     }
 
-    let document: NotarizedDocument | null = null;
+    let document = null;
 
     if (dto.serialNumber) {
-      document = await this.documentRepository.findOne({
-        where: { serialNumber: dto.serialNumber },
-        relations: ['register', 'lawyer', 'hashes'],
-      });
+      document = await this.documentRepository.findBySerialNumber(dto.serialNumber);
     }
 
     if (!document && dto.sha256Hash) {
-      const hash = await this.hashRepository.findOne({
-        where: { sha256Hash: dto.sha256Hash },
-        relations: ['document', 'document.lawyer', 'document.register'],
-      });
+      const hash = await this.hashRepository.findBySha256Hash(dto.sha256Hash);
 
       if (hash) {
         document = hash.document;

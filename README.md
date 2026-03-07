@@ -1,28 +1,33 @@
 # DIGITAL NOTARY VERIFICATION API
 
-Production-grade backend API for the **Integrated Bar of the Philippines (IBP)** to serialize, verify, monitor, and audit notarization activity nationwide.
+Production-grade backend API for the Integrated Bar of the Philippines (IBP) to serialize, verify, monitor, and audit notarization activity nationwide.
 
 ## Features
 
 - NestJS REST API with `/api/v1/` versioning
-- JWT authentication
-- Role-based access control
-- SHA-256 document verification
+- JWT authentication and RBAC authorization
+- Swagger-decorated request DTOs
+- SHA-256 document verification and duplicate hash detection
 - Append-only tamper-evident audit logging
-- Fraud detection alerts
-- PostgreSQL-backed persistence
-- Dockerized local development
-- GitHub Actions CI
+- BullMQ-backed fraud analysis queue
+- Pino structured logging via `nestjs-pino`
+- Prometheus metrics at `/metrics`
+- Optional OpenTelemetry bootstrap
+- PostgreSQL-backed persistence with repository abstractions
+- Fraud and audit reviewer endpoints
+- Docker/OrbStack local development, NGINX config, and Kubernetes manifests
 
 ## Technology Stack
 
 - Node.js 20+
-- NestJS
+- NestJS 10
 - PostgreSQL 15+
+- Redis 7+
 - TypeORM
-- Jest
-- Docker
-- Swagger / OpenAPI
+- BullMQ
+- Pino
+- Prometheus / OpenTelemetry ready instrumentation
+- Jest / Supertest
 
 ## Local Setup
 
@@ -32,23 +37,41 @@ Production-grade backend API for the **Integrated Bar of the Philippines (IBP)**
 cp .env.example .env
 ```
 
-### 2. Start services
+### 2. Start PostgreSQL and Redis
 
 ```bash
-docker-compose up --build
+docker compose up -d postgres redis
 ```
 
-### 3. Open API docs
+### 3. Install dependencies
 
 ```bash
-http://localhost:3000/api/docs
+npm install
 ```
 
-## API Base URL
+### 4. Seed demo data
 
-```text
-/api/v1/
+```bash
+docker compose exec -T postgres psql -U postgres -d digital_notary < database/seed/local-dev.sql
 ```
+
+Optional demo notarization seed:
+
+```bash
+npm run seed:sql
+```
+
+### 5. Start the API
+
+```bash
+npm run start:dev
+```
+
+## Useful Endpoints
+
+- API docs: `http://localhost:3000/api/docs`
+- Health: `http://localhost:3000/api/v1/health`
+- Metrics: `http://localhost:3000/metrics`
 
 ## Core Endpoints
 
@@ -65,90 +88,33 @@ http://localhost:3000/api/docs
 
 - `POST /api/v1/verification`
 
-### Health
+### Audit
 
-- `GET /api/v1/health`
+- `GET /api/v1/audit/logs`
+- `GET /api/v1/audit/logs/:id`
 
-## Example Login Request
+### Fraud
 
-```json
-{
-  "email": "notary1@ibp.gov.ph",
-  "password": "ChangeMe123!"
-}
+- `GET /api/v1/fraud/alerts`
+- `PATCH /api/v1/fraud/alerts/:id/resolve`
+
+## Default Local Credentials
+
+- `admin@ibp.gov.ph` / `ChangeMe123!`
+- `auditor@ibp.gov.ph` / `ChangeMe123!`
+- `notary1@ibp.gov.ph` / `ChangeMe123!`
+
+## Infrastructure Assets
+
+- NGINX production config: [nginx/nginx.conf](nginx/nginx.conf)
+- Kubernetes manifests: [k8s/namespace.yaml](k8s/namespace.yaml)
+- Database schema: [database/migrations/initial_schema.sql](database/migrations/initial_schema.sql)
+- Demo SQL seed: [database/seed/demo_seed.sql](database/seed/demo_seed.sql)
+
+## Validation
+
+```bash
+npm run build
+npm run test
+npm run lint
 ```
-
-## Example Login Response
-
-```json
-{
-  "accessToken": "jwt-token-here",
-  "user": {
-    "id": "uuid",
-    "email": "notary1@ibp.gov.ph",
-    "role": "NOTARY",
-    "fullName": "Atty. Example User",
-    "ibpNumber": "IBP-2026-0001"
-  }
-}
-```
-
-## Serial Number Format
-
-```text
-LAWYER_ID + REGISTER_BOOK + TIMESTAMP + SEQUENCE
-```
-
-Example:
-
-```text
-0f7e65b1-RB2026-20260307083000-000001
-```
-
-## Security Controls
-
-- TLS-ready deployment behind reverse proxy
-- JWT bearer auth
-- RBAC guards
-- ValidationPipe input validation
-- Rate limiting
-- SHA-256 hashing only
-- No raw document storage
-- Tamper-evident audit chaining
-
-## Fraud Detection Rules
-
-- Excessive notarizations per hour
-- Excessive notarizations per day
-- Duplicate document hash reuse
-- Burst anomaly hooks for future queue worker expansion
-
-## Production Hardening Recommendations
-
-- Run behind NGINX or cloud load balancer with TLS 1.2+
-- Store JWT secret in secret manager
-- Enable OpenTelemetry tracing
-- Export Prometheus metrics
-- Use BullMQ or RabbitMQ for fraud jobs
-- Add Redis-backed distributed rate limiting
-- Enable database PITR backups
-- Add WORM archival for audit exports
-
-## Migration Strategy
-
-Initial schema is stored in:
-
-```text
-database/migrations/initial_schema.sql
-```
-
-Future migrations should:
-- be additive when possible
-- include rollback scripts
-- preserve audit immutability guarantees
-
-## Notes
-
-- The API stores only hashes and metadata
-- Document originals must remain outside the platform
-- Audit logs should never be edited or deleted

@@ -1,29 +1,15 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { AuditLogParams } from '../../common/interfaces/audit-log-params.interface';
 import { sha256Hex } from '../../common/utils/hash.util';
-import { AuditLog } from '../../entities/audit-log.entity';
+import { AuditLogDataRepository } from '../../repositories/audit-log-data.repository';
+import { AuditLogQueryDto } from './dto/audit-log-query.dto';
 
 @Injectable()
 export class AuditService {
-  constructor(
-    @InjectRepository(AuditLog)
-    private readonly auditRepository: Repository<AuditLog>,
-  ) {}
+  constructor(private readonly auditRepository: AuditLogDataRepository) {}
 
-  async log(params: {
-    actorId?: string;
-    actorRole?: string;
-    action: string;
-    resourceType: string;
-    resourceId?: string;
-    metadata?: Record<string, unknown>;
-    requestIp?: string;
-  }) {
-    const lastEntry = await this.auditRepository.findOne({
-      where: {},
-      order: { createdAt: 'DESC' },
-    });
+  async log(params: AuditLogParams) {
+    const lastEntry = await this.auditRepository.findLatest();
 
     const previousHash = lastEntry?.entryHash ?? null;
 
@@ -52,5 +38,40 @@ export class AuditService {
       previousHash: previousHash ?? undefined,
       entryHash,
     });
+  }
+
+  async getLogs(query: AuditLogQueryDto) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 20, 100);
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await this.auditRepository.findPaginated(
+      skip,
+      limit,
+      query.action,
+    );
+
+    return {
+      status: 'success',
+      data: {
+        page,
+        limit,
+        total,
+        items,
+      },
+    };
+  }
+
+  async getLogById(id: string) {
+    const item = await this.auditRepository.findById(id);
+
+    if (!item) {
+      throw new NotFoundException('Audit log not found');
+    }
+
+    return {
+      status: 'success',
+      data: item,
+    };
   }
 }

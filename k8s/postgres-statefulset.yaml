@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: digital-notary-postgres
+  namespace: digital-notary
+spec:
+  serviceName: digital-notary-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: digital-notary-postgres
+  template:
+    metadata:
+      labels:
+        app: digital-notary-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: digital-notary-config
+                  key: DB_NAME
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: digital-notary-config
+                  key: DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: digital-notary-secret
+                  key: DB_PASSWORD
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ['ReadWriteOnce']
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: digital-notary-postgres
+  namespace: digital-notary
+spec:
+  selector:
+    app: digital-notary-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

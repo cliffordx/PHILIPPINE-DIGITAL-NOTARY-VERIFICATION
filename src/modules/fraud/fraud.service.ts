@@ -1,62 +1,56 @@
-import { Injectable } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { Queue } from 'bullmq';
+import { FraudAnalysisJob } from '../../common/interfaces/fraud-analysis-job.interface';
+import { RequestActor } from '../../common/interfaces/request-actor.interface';
 import { FraudAlertType } from '../../common/enums/fraud-alert-type.enum';
-import { DocumentHash } from '../../entities/document-hash.entity';
-import { FraudAlert } from '../../entities/fraud-alert.entity';
-import { NotarizedDocument } from '../../entities/notarized-document.entity';
+import { DocumentHashDataRepository } from '../../repositories/document-hash-data.repository';
+import { FraudAlertDataRepository } from '../../repositories/fraud-alert-data.repository';
+import { NotarizedDocumentDataRepository } from '../../repositories/notarized-document-data.repository';
 import { AuditService } from '../audit/audit.service';
+import { FraudAlertQueryDto } from './dto/fraud-alert-query.dto';
+import { FRAUD_ANALYSIS_QUEUE } from './fraud.constants';
 
 @Injectable()
 export class FraudService {
   constructor(
     private readonly configService: ConfigService,
-    @InjectRepository(FraudAlert)
-    private readonly alertRepository: Repository<FraudAlert>,
-    @InjectRepository(NotarizedDocument)
-    private readonly documentRepository: Repository<NotarizedDocument>,
-    @InjectRepository(DocumentHash)
-    private readonly hashRepository: Repository<DocumentHash>,
+    private readonly alertRepository: FraudAlertDataRepository,
+    private readonly documentRepository: NotarizedDocumentDataRepository,
+    private readonly hashRepository: DocumentHashDataRepository,
     private readonly auditService: AuditService,
+    @InjectQueue(FRAUD_ANALYSIS_QUEUE)
+    private readonly fraudQueue: Queue<FraudAnalysisJob>,
   ) {}
 
-  async enqueueAnalysis(job: {
-    lawyerId: string;
-    documentId: string;
-    sha256Hash: string;
-    notarizedAt: string;
-  }) {
-    await this.runFraudChecks(job);
+  async enqueueAnalysis(job: FraudAnalysisJob) {
+    await this.fraudQueue.add('analyze', job, {
+      removeOnComplete: 25,
+      removeOnFail: 50,
+    });
   }
 
-  private async runFraudChecks(job: {
-    lawyerId: string;
-    documentId: string;
-    sha256Hash: string;
-    notarizedAt: string;
-  }) {
+  async handleFraudAnalysis(job: FraudAnalysisJob) {
     const now = new Date(job.notarizedAt);
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    const hourlyCount = await this.documentRepository.count({
-      where: {
-        lawyerId: job.lawyerId,
-        notarizedAt: MoreThan(oneHourAgo),
-      },
-    });
+    const [hourlyItems] = await this.documentRepository.findLawyerHistory(
+      job.lawyerId,
+      0,
+      500,
+    );
+    const hourlyCount = hourlyItems.filter(
+      (item) => item.notarizedAt > oneHourAgo,
+    ).length;
+    const dailyCount = hourlyItems.filter(
+      (item) => item.notarizedAt > oneDayAgo,
+    ).length;
 
-    const dailyCount = await this.documentRepository.count({
-      where: {
-        lawyerId: job.lawyerId,
-        notarizedAt: MoreThan(oneDayAgo),
-      },
-    });
-
-    const duplicateHashCount = await this.hashRepository.count({
-      where: { sha256Hash: job.sha256Hash },
-    });
+    const duplicateHashCount = await this.hashRepository.countBySha256Hash(
+      job.sha256Hash,
+    );
 
     const hourlyThreshold = this.configService.get<number>(
       'FRAUD_HOURLY_THRESHOLD',
@@ -93,6 +87,57 @@ export class FraudService {
         { sha256Hash: job.sha256Hash, duplicateHashCount },
       );
     }
+  }
+
+  async getAlerts(query: FraudAlertQueryDto) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 20, 100);
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await this.alertRepository.findPaginated(
+      skip,
+      limit,
+      query.resolved,
+    );
+
+    return {
+      status: 'success',
+      data: {
+        page,
+        limit,
+        total,
+        items,
+      },
+    };
+  }
+
+  async resolveAlert(id: string, actor: RequestActor) {
+    const alert = await this.alertRepository.findById(id);
+
+    if (!alert) {
+      throw new NotFoundException('Fraud alert not found');
+    }
+
+    const resolvedAlert = await this.alertRepository.save({
+      ...alert,
+      resolved: true,
+    });
+
+    await this.auditService.log({
+      actorId: actor.userId,
+      actorRole: actor.role,
+      action: 'FRAUD_ALERT_RESOLVED',
+      resourceType: 'FRAUD_ALERT',
+      resourceId: resolvedAlert.id,
+      metadata: {
+        resolved: true,
+      },
+    });
+
+    return {
+      status: 'success',
+      data: resolvedAlert,
+    };
   }
 
   private async createAlert(

@@ -11,6 +11,15 @@ export const envValidationSchema = Joi.object({
   JWT_SECRET: Joi.string().min(32).required(),
   JWT_EXPIRES_IN: Joi.string().default('1h'),
   LOG_LEVEL: Joi.string().default('info'),
+  REDIS_HOST: Joi.string().default('localhost'),
+  REDIS_PORT: Joi.number().default(6379),
+  REDIS_PASSWORD: Joi.string().allow('').optional(),
+  METRICS_ENABLED: Joi.boolean().truthy('true').falsy('false').default(true),
+  OTEL_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
+  OTEL_SERVICE_NAME: Joi.string().default('digital-notary-verification-api'),
+  OTEL_EXPORTER_OTLP_ENDPOINT: Joi.string()
+    .uri()
+    .default('http://localhost:4318/v1/traces'),
   FRAUD_HOURLY_THRESHOLD: Joi.number().default(30),
   FRAUD_DAILY_THRESHOLD: Joi.number().default(200),
 });

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: digital-notary-config
+  namespace: digital-notary
+data:
+  NODE_ENV: production
+  PORT: '3000'
+  DB_HOST: digital-notary-postgres
+  DB_PORT: '5432'
+  DB_NAME: digital_notary
+  DB_USER: postgres
+  REDIS_HOST: digital-notary-redis
+  REDIS_PORT: '6379'
+  METRICS_ENABLED: 'true'
+  OTEL_ENABLED: 'false'
+  OTEL_SERVICE_NAME: digital-notary-verification-api
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
+  FRAUD_HOURLY_THRESHOLD: '30'
+  FRAUD_DAILY_THRESHOLD: '200'
