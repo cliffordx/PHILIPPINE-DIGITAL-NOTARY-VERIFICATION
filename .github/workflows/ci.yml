@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: digital_notary_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      NODE_ENV: test
+      PORT: 3000
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: digital_notary_test
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      JWT_SECRET: test_secret_that_is_long_enough_for_ci_runs_123456
+      JWT_EXPIRES_IN: 1h
+      FRAUD_HOURLY_THRESHOLD: 30
+      FRAUD_DAILY_THRESHOLD: 200
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm ci
+      - run: psql postgresql://postgres:postgres@localhost:5432/digital_notary_test -f database/migrations/initial_schema.sql
+      - run: npm run lint
+      - run: npm run test

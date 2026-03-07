@@ -1,0 +1,30 @@
+services:
+  api:
+    build: .
+    container_name: digital-notary-api
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+    volumes:
+      - .:/app
+    command: npm run start:dev
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: digital-notary-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: digital_notary
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations/initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql:ro
+
+volumes:
+  postgres_data:
