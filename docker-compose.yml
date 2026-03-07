@@ -1,0 +1,112 @@
+version: '3.9'
+
+services:
+  # ============================================================
+  # API Application
+  # ============================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: notary-api:latest
+    container_name: notary_api
+    restart: unless-stopped
+    ports:
+      - '${PORT:-3000}:3000'
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-notary_user}
+      DB_PASSWORD: ${DB_PASSWORD:-notary_password}
+      DB_NAME: ${DB_NAME:-notary_db}
+      DB_SSL: 'false'
+      DB_LOGGING: 'false'
+      JWT_SECRET: ${JWT_SECRET:-CHANGE_THIS_IN_PRODUCTION}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-CHANGE_THIS_REFRESH_SECRET}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      THROTTLE_TTL: ${THROTTLE_TTL:-60}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-100}
+      FRAUD_HOURLY_THRESHOLD: ${FRAUD_HOURLY_THRESHOLD:-20}
+      FRAUD_DAILY_THRESHOLD: ${FRAUD_DAILY_THRESHOLD:-100}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - notary_network
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://localhost:3000/api/v1/health',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  # ============================================================
+  # PostgreSQL Database
+  # ============================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: notary_postgres
+    restart: unless-stopped
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-notary_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-notary_password}
+      POSTGRES_DB: ${DB_NAME:-notary_db}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations/initial_schema.sql:/docker-entrypoint-initdb.d/01_initial_schema.sql:ro
+    networks:
+      - notary_network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-notary_user} -d ${DB_NAME:-notary_db}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================================
+  # PgAdmin (Development only)
+  # ============================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: notary_pgadmin
+    restart: unless-stopped
+    profiles:
+      - dev
+    ports:
+      - '5050:80'
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@notary.ph}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    depends_on:
+      - postgres
+    networks:
+      - notary_network
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+volumes:
+  postgres_data:
+    name: notary_postgres_data
+  pgadmin_data:
+    name: notary_pgadmin_data
+
+networks:
+  notary_network:
+    name: notary_network
+    driver: bridge
