@@ -2,6 +2,8 @@
 
 Production-grade backend API for the Integrated Bar of the Philippines (IBP) to serialize, verify, monitor, and audit notarization activity nationwide.
 
+Author's Note & Disclaimer: This is Proof-of-Concept Digital Notary I created for educational purposes only. This is not an OFFICIAL API for the eNotary or any authorized e-Notarization platform. **[Thursday, September 24, 2026; 14:16:55]**
+
 ## Features
 
 - NestJS REST API with `/api/v1/` versioning
