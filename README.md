@@ -1,4 +1,4 @@
-# DIGITAL NOTARY VERIFICATION API
+# DIGITAL NOTARY VERIFICATION API (POC)
 
 Production-grade backend API for the Integrated Bar of the Philippines (IBP) to serialize, verify, monitor, and audit notarization activity nationwide.
 
